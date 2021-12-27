@@ -40,6 +40,8 @@ typedef struct MPEG2MetadataContext {
     int transfer_characteristics;
     int matrix_coefficients;
 
+    int ivtc;
+
     int mpeg1_warned;
 } MPEG2MetadataContext;
 
@@ -53,6 +55,7 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
     MPEG2RawSequenceExtension         *se = NULL;
     MPEG2RawSequenceDisplayExtension *sde = NULL;
     int i, se_pos;
+    int last_code = -1;
 
     for (i = 0; i < frag->nb_units; i++) {
         if (frag->units[i].type == MPEG2_START_SEQUENCE_HEADER) {
@@ -66,8 +69,25 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
             } else if (ext->extension_start_code_identifier ==
                 MPEG2_EXTENSION_SEQUENCE_DISPLAY) {
                 sde = &ext->data.sequence_display;
+            } else if (ext->extension_start_code_identifier ==
+                MPEG2_EXTENSION_PICTURE_CODING && last_code ==
+                MPEG2_START_PICTURE) {
+                if (ctx->ivtc) {
+                    MPEG2RawPictureCodingExtension *pce = &ext->data.picture_coding;
+                    if (!pce->frame_pred_frame_dct) {
+                        av_log(bsf, AV_LOG_ERROR, "invalid frame_pred_frame_dct\n");
+                        return -1;
+                    }
+                    if (!pce->progressive_frame) {
+                        av_log(bsf, AV_LOG_ERROR, "interlaced frame found\n");
+                        return -1;
+                    }
+                    pce->repeat_first_field = 0;
+                    pce->top_field_first = 0;
+                }
             }
         }
+        last_code = frag->units[i].type;
     }
 
     if (!sh || !se) {
@@ -165,6 +185,9 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
         }
     }
 
+    if (ctx->ivtc)
+        se->progressive_sequence = 1;
+
     return 0;
 }
 
@@ -217,6 +240,10 @@ static const AVOption mpeg2_metadata_options[] = {
     { "matrix_coefficients", "Set matrix coefficients (table 6-9)",
         OFFSET(matrix_coefficients), AV_OPT_TYPE_INT,
         { .i64 = -1 }, -1, 255, FLAGS },
+
+    { "ivtc", "Inverse (soft) Telecine",
+        OFFSET(ivtc), AV_OPT_TYPE_BOOL,
+        { .i64 = 0 }, 0, 1, FLAGS },
 
     { NULL }
 };

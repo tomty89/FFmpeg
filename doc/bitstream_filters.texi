@@ -569,6 +569,12 @@ table 6-6).
 Set the colour description in the stream (see H.262 section 6.3.6
 and tables 6-7, 6-8 and 6-9).
 
+@item ivtc
+Inverse (soft) telecine, i.e. mark the sequences as progressive
+and clear the repeat_first_field and top_field_first bits in
+the Picture Coding Extension Data. Works only with sequences
+that are entirely progressive in nature.
+
 @end table
 
 @section mpeg4_unpack_bframes
