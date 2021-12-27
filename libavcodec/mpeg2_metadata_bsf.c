@@ -185,8 +185,23 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
         }
     }
 
-    if (ctx->ivtc)
+    if (ctx->ivtc) {
+        if (sh->frame_rate_code != 4) {
+            av_log(bsf, AV_LOG_ERROR, "not NTSC: %d\n",
+                   sh->frame_rate_code);
+            return -1;
+        } else {
+            sh->frame_rate_code = 1;
+        }
         se->progressive_sequence = 1;
+        if (se->frame_rate_extension_n ||
+            se->frame_rate_extension_d) {
+            av_log(bsf, AV_LOG_ERROR, "ext_n: %d, ext_d: %d\n",
+                   se->frame_rate_extension_n,
+                   se->frame_rate_extension_d);
+            return -1;
+        }
+    }
 
     return 0;
 }
