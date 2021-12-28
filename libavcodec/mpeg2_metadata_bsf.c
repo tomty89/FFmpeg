@@ -78,9 +78,10 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                 MPEG2_EXTENSION_SEQUENCE_DISPLAY) {
                 sde = &ext->data.sequence_display;
             } else if (ext->extension_start_code_identifier ==
-                MPEG2_EXTENSION_PICTURE_CODING && last_code ==
-                MPEG2_START_PICTURE) {
-                if (ctx->ivtc) {
+                MPEG2_EXTENSION_PICTURE_CODING) {
+                if (last_code != MPEG2_START_PICTURE) {
+                    av_log(bsf, AV_LOG_WARNING, "free PCE\n");
+                } else if (ctx->ivtc) {
                     MPEG2RawPictureCodingExtension *pce = &ext->data.picture_coding;
                     if (!pce->frame_pred_frame_dct) {
                         av_log(bsf, AV_LOG_ERROR, "invalid frame_pred_frame_dct\n");
