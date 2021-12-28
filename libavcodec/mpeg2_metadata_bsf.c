@@ -92,8 +92,10 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                         av_log(bsf, AV_LOG_ERROR, "interlaced frame found\n");
                         return -1;
                     }
-                    pce->repeat_first_field = 0;
-                    pce->top_field_first = 0;
+                    if (ctx->ivtc < 2) {
+                        pce->repeat_first_field = 0;
+                        pce->top_field_first = 0;
+                    }
                     ctx->pce_count++;
                 }
             }
@@ -207,10 +209,11 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
             av_log(bsf, AV_LOG_ERROR, "not NTSC: %d\n",
                    sh->frame_rate_code);
             return -1;
-        } else {
+        } else if (ctx->ivtc < 2) {
             sh->frame_rate_code = 1;
         }
-        se->progressive_sequence = 1;
+        if (ctx->ivtc < 2)
+            se->progressive_sequence = 1;
         if (se->frame_rate_extension_n ||
             se->frame_rate_extension_d) {
             av_log(bsf, AV_LOG_ERROR, "ext_n: %d, ext_d: %d\n",
@@ -285,8 +288,8 @@ static const AVOption mpeg2_metadata_options[] = {
         { .i64 = -1 }, -1, 255, FLAGS },
 
     { "ivtc", "Inverse (soft) Telecine",
-        OFFSET(ivtc), AV_OPT_TYPE_BOOL,
-        { .i64 = 0 }, 0, 1, FLAGS },
+        OFFSET(ivtc), AV_OPT_TYPE_INT,
+        { .i64 = 0 }, 0, 2, FLAGS },
 
     { NULL }
 };
