@@ -46,6 +46,15 @@ typedef struct MPEG2MetadataContext {
     int mpeg1_warned;
 } MPEG2MetadataContext;
 
+static void i_seq_reporting(AVBSFContext *bsf, MPEG2MetadataContext *ctx) {
+    if (ctx->ivtc > 2) {
+        av_log(bsf, AV_LOG_WARNING, "i_seq: %d\n", ctx->i_frame);
+        av_log(bsf, AV_LOG_WARNING, "i_seq: %d\n", ctx->pce_count + 1);
+    } else {
+        av_log(bsf, AV_LOG_WARNING, "i_seq: last-I: %d, first-PCE: %d, num-PCE:%d, next-I: %d\n",
+               ctx->i_frame, ctx->first_pce, ctx->i_seq, ctx->pce_count + 1);
+    }
+}
 
 static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                                           AVPacket *pkt,
@@ -98,21 +107,20 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                         pce->top_field_first = 0;
                     }
                     ctx->pce_count++;
-                    if (ctx->ivtc == 2 &&
+                    if (ctx->ivtc >= 2 &&
                         (!pce->frame_pred_frame_dct || !pce->progressive_frame)) {
                         if (++ctx->i_seq == 1)
                             ctx->first_pce = ctx->pce_count;
                     }
                 }
             }
-        } else if (frag->units[i].type == MPEG2_START_PICTURE) {
+        } else if (ctx->ivtc > 1 && frag->units[i].type == MPEG2_START_PICTURE) {
             ph = frag->units[i].content;
             if (ph->picture_coding_type == 1) {
                 if (!ctx->i_seq) {
                     ctx->i_frame = ctx->pce_count + 1;
                 } else {
-                    av_log(bsf, AV_LOG_WARNING, "i_seq: last-I: %d, first-PCE: %d, num-PCE:%d, next-I: %d\n",
-                           ctx->i_frame, ctx->first_pce, ctx->i_seq, ctx->pce_count + 1);
+                    i_seq_reporting(bsf, ctx);
                     ctx->i_seq = 0;
                 }
             }
@@ -277,6 +285,8 @@ static int mpeg2_metadata_init(AVBSFContext *bsf)
 
 static void mpeg2_metadata_close(AVBSFContext *bsf) {
     MPEG2MetadataContext *ctx = bsf->priv_data;
+    if (ctx->i_seq)
+        i_seq_reporting(bsf, ctx);
     av_log(bsf, AV_LOG_INFO, "she_a: %d, she_b: %d, pce: %d\n",
            ctx->she_count_a, ctx->she_count_b, ctx->pce_count);
     ff_cbs_bsf_generic_close(bsf);
@@ -307,7 +317,7 @@ static const AVOption mpeg2_metadata_options[] = {
 
     { "ivtc", "Inverse (soft) Telecine",
         OFFSET(ivtc), AV_OPT_TYPE_INT,
-        { .i64 = 0 }, 0, 2, FLAGS },
+        { .i64 = 0 }, 0, 3, FLAGS },
 
     { NULL }
 };
