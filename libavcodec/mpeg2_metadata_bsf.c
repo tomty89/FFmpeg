@@ -41,6 +41,7 @@ typedef struct MPEG2MetadataContext {
     int matrix_coefficients;
 
     int ivtc;
+    unsigned int she_count_a, she_count_b, pce_count;
 
     int mpeg1_warned;
 } MPEG2MetadataContext;
@@ -93,6 +94,7 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                     }
                     pce->repeat_first_field = 0;
                     pce->top_field_first = 0;
+                    ctx->pce_count++;
                 }
             }
         }
@@ -114,6 +116,8 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
             av_log(bsf, AV_LOG_WARNING, "no se but sh\n");
         return 0;
     }
+
+    ctx->she_count_a++;
 
     if (ctx->display_aspect_ratio.num && ctx->display_aspect_ratio.den) {
         int num, den;
@@ -214,6 +218,7 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                    se->frame_rate_extension_d);
             return -1;
         }
+        ctx->she_count_b++;
     }
 
     return 0;
@@ -242,9 +247,19 @@ static int mpeg2_metadata_init(AVBSFContext *bsf)
     VALIDITY_CHECK(matrix_coefficients);
 #undef VALIDITY_CHECK
 
+    ctx->pce_count = 0;
+    ctx->she_count_a = 0;
+    ctx->she_count_b = 0;
+
     return ff_cbs_bsf_generic_init(bsf, &mpeg2_metadata_type);
 }
 
+static void mpeg2_metadata_close(AVBSFContext *bsf) {
+    MPEG2MetadataContext *ctx = bsf->priv_data;
+    av_log(bsf, AV_LOG_INFO, "she_a: %d, she_b: %d, pce: %d\n",
+           ctx->she_count_a, ctx->she_count_b, ctx->pce_count);
+    ff_cbs_bsf_generic_close(bsf);
+}
 #define OFFSET(x) offsetof(MPEG2MetadataContext, x)
 #define FLAGS (AV_OPT_FLAG_VIDEO_PARAM|AV_OPT_FLAG_BSF_PARAM)
 static const AVOption mpeg2_metadata_options[] = {
@@ -293,6 +308,6 @@ const FFBitStreamFilter ff_mpeg2_metadata_bsf = {
     .p.priv_class   = &mpeg2_metadata_class,
     .priv_data_size = sizeof(MPEG2MetadataContext),
     .init           = &mpeg2_metadata_init,
-    .close          = &ff_cbs_bsf_generic_close,
+    .close          = &mpeg2_metadata_close,
     .filter         = &ff_cbs_bsf_generic_filter,
 };
