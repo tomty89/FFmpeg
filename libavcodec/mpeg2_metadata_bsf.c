@@ -59,11 +59,19 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
 
     for (i = 0; i < frag->nb_units; i++) {
         if (frag->units[i].type == MPEG2_START_SEQUENCE_HEADER) {
+            if (sh) {
+                av_log(bsf, AV_LOG_ERROR, "more than one sh in frag\n");
+                return -1;
+            }
             sh = frag->units[i].content;
         } else if (frag->units[i].type == MPEG2_START_EXTENSION) {
             MPEG2RawExtensionData *ext = frag->units[i].content;
             if (ext->extension_start_code_identifier ==
                 MPEG2_EXTENSION_SEQUENCE) {
+                if (se) {
+                    av_log(bsf, AV_LOG_ERROR, "more than one se in frag\n");
+                    return -1;
+                }
                 se = &ext->data.sequence;
                 se_pos = i;
             } else if (ext->extension_start_code_identifier ==
