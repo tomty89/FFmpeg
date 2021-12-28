@@ -40,8 +40,8 @@ typedef struct MPEG2MetadataContext {
     int transfer_characteristics;
     int matrix_coefficients;
 
-    int ivtc;
-    unsigned int she_count_a, she_count_b, pce_count;
+    int ivtc, i_seq;
+    unsigned int she_count_a, she_count_b, pce_count, i_frame, first_pce;
 
     int mpeg1_warned;
 } MPEG2MetadataContext;
@@ -55,6 +55,7 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
     MPEG2RawSequenceHeader            *sh = NULL;
     MPEG2RawSequenceExtension         *se = NULL;
     MPEG2RawSequenceDisplayExtension *sde = NULL;
+    MPEG2RawPictureHeader             *ph = NULL;
     int i, se_pos;
     int last_code = -1;
 
@@ -84,19 +85,35 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                     av_log(bsf, AV_LOG_WARNING, "free PCE\n");
                 } else if (ctx->ivtc) {
                     MPEG2RawPictureCodingExtension *pce = &ext->data.picture_coding;
-                    if (!pce->frame_pred_frame_dct) {
-                        av_log(bsf, AV_LOG_ERROR, "invalid frame_pred_frame_dct\n");
-                        return -1;
-                    }
-                    if (!pce->progressive_frame) {
-                        av_log(bsf, AV_LOG_ERROR, "interlaced frame found\n");
-                        return -1;
-                    }
                     if (ctx->ivtc < 2) {
+                        if (!pce->frame_pred_frame_dct) {
+                            av_log(bsf, AV_LOG_ERROR, "invalid frame_pred_frame_dct\n");
+                            return -1;
+                        }
+                        if (!pce->progressive_frame) {
+                            av_log(bsf, AV_LOG_ERROR, "interlaced frame found\n");
+                            return -1;
+                        }
                         pce->repeat_first_field = 0;
                         pce->top_field_first = 0;
                     }
                     ctx->pce_count++;
+                    if (ctx->ivtc == 2 &&
+                        (!pce->frame_pred_frame_dct || !pce->progressive_frame)) {
+                        if (++ctx->i_seq == 1)
+                            ctx->first_pce = ctx->pce_count;
+                    }
+                }
+            }
+        } else if (frag->units[i].type == MPEG2_START_PICTURE) {
+            ph = frag->units[i].content;
+            if (ph->picture_coding_type == 1) {
+                if (!ctx->i_seq) {
+                    ctx->i_frame = ctx->pce_count + 1;
+                } else {
+                    av_log(bsf, AV_LOG_WARNING, "i_seq: last-I: %d, first-PCE: %d, num-PCE:%d, next-I: %d\n",
+                           ctx->i_frame, ctx->first_pce, ctx->i_seq, ctx->pce_count + 1);
+                    ctx->i_seq = 0;
                 }
             }
         }
@@ -253,6 +270,7 @@ static int mpeg2_metadata_init(AVBSFContext *bsf)
     ctx->pce_count = 0;
     ctx->she_count_a = 0;
     ctx->she_count_b = 0;
+    ctx->i_seq = 0;
 
     return ff_cbs_bsf_generic_init(bsf, &mpeg2_metadata_type);
 }
