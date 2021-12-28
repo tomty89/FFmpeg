@@ -108,6 +108,10 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
                    "actually MPEG-1?\n");
             ctx->mpeg1_warned = 1;
         }
+        if (se)
+            av_log(bsf, AV_LOG_WARNING, "no sh but se\n");
+        if (sh)
+            av_log(bsf, AV_LOG_WARNING, "no se but sh\n");
         return 0;
     }
 
