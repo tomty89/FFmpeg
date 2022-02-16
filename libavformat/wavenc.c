@@ -85,6 +85,7 @@ typedef struct WAVMuxContext {
     int peak_block_pos;
     int peak_ppv;
     int peak_bps;
+    int extensible;
 } WAVMuxContext;
 
 #if CONFIG_WAV_MUXER
@@ -326,9 +327,10 @@ static int wav_write_header(AVFormatContext *s)
     }
 
     if (wav->write_peak != PEAK_ONLY) {
+        int flags = !wav->extensible ? FF_PUT_WAV_HEADER_FORCE_PCMWAVEFORMAT : 0;
         /* format header */
         fmt = ff_start_tag(pb, "fmt ");
-        if (ff_put_wav_header(s, pb, s->streams[0]->codecpar, 0) < 0) {
+        if (ff_put_wav_header(s, pb, s->streams[0]->codecpar, flags) < 0) {
             av_log(s, AV_LOG_ERROR, "Codec %s not supported in WAVE format\n",
                    avcodec_get_name(s->streams[0]->codecpar->codec_id));
             return AVERROR(ENOSYS);
@@ -496,6 +498,7 @@ static const AVOption options[] = {
     { "peak_block_size", "Number of audio samples used to generate each peak frame.",   OFFSET(peak_block_size), AV_OPT_TYPE_INT, { .i64 = 256 }, 0, 65536, ENC },
     { "peak_format",     "The format of the peak envelope data (1: uint8, 2: uint16).", OFFSET(peak_format), AV_OPT_TYPE_INT,     { .i64 = PEAK_FORMAT_UINT16 }, PEAK_FORMAT_UINT8, PEAK_FORMAT_UINT16, ENC },
     { "peak_ppv",        "Number of peak points per peak value (1 or 2).",              OFFSET(peak_ppv), AV_OPT_TYPE_INT, { .i64 = 2 }, 1, 2, ENC },
+    { "extensible",      "Write WAVEFORMATEXTENSIBLE extensions.",                      OFFSET(extensible), AV_OPT_TYPE_BOOL, { .i64 = 1 }, 0, 1, ENC },
     { NULL },
 };
 

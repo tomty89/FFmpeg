@@ -58,6 +58,11 @@ void ff_put_bmp_header(AVIOContext *pb, AVCodecParameters *par, int for_asf, int
 #define FF_PUT_WAV_HEADER_SKIP_CHANNELMASK      0x00000002
 
 /**
+ * Tell ff_put_wav_header() not to write WAVEFORMATEXTENSIBLE extensions if possible.
+ */
+#define FF_PUT_WAV_HEADER_FORCE_PCMWAVEFORMAT      0x00000004
+
+/**
  * Write WAVEFORMAT header structure.
  *
  * @param flags a combination of FF_PUT_WAV_HEADER_* constants

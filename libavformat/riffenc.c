@@ -80,9 +80,9 @@ int ff_put_wav_header(AVFormatContext *s, AVIOContext *pb,
     waveformatextensible = (par->ch_layout.order == AV_CHANNEL_ORDER_NATIVE &&
                             av_channel_layout_compare(&par->ch_layout, &(AVChannelLayout)AV_CHANNEL_LAYOUT_MONO) &&
                             av_channel_layout_compare(&par->ch_layout, &(AVChannelLayout)AV_CHANNEL_LAYOUT_STEREO)) ||
-                           par->sample_rate > 48000 ||
                            par->codec_id == AV_CODEC_ID_EAC3 || par->codec_id == AV_CODEC_ID_DFPWM ||
-                           av_get_bits_per_sample(par->codec_id) > 16;
+                           ((par->sample_rate > 48000 || av_get_bits_per_sample(par->codec_id) > 16) &&
+                            !(flags & FF_PUT_WAV_HEADER_FORCE_PCMWAVEFORMAT));
 
     if (waveformatextensible)
         avio_wl16(pb, 0xfffe);
