@@ -42,6 +42,7 @@ typedef struct MPEG2MetadataContext {
 
     int ivtc, i_seq;
     unsigned int she_count_a, she_count_b, pce_count, i_frame, first_pce;
+    unsigned int fs_count, call_count;
 
     int mpeg1_warned;
 } MPEG2MetadataContext;
@@ -67,6 +68,8 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
     MPEG2RawPictureHeader             *ph = NULL;
     int i, se_pos;
     int last_code = -1;
+
+    ctx->call_count++;
 
     for (i = 0; i < frag->nb_units; i++) {
         if (frag->units[i].type == MPEG2_START_SEQUENCE_HEADER) {
@@ -141,6 +144,7 @@ static int mpeg2_metadata_update_fragment(AVBSFContext *bsf,
             av_log(bsf, AV_LOG_WARNING, "no sh but se\n");
         if (sh)
             av_log(bsf, AV_LOG_WARNING, "no se but sh\n");
+        ctx->fs_count++;
         return 0;
     }
 
@@ -279,6 +283,8 @@ static int mpeg2_metadata_init(AVBSFContext *bsf)
     ctx->she_count_a = 0;
     ctx->she_count_b = 0;
     ctx->i_seq = 0;
+    ctx->fs_count = 0;
+    ctx->call_count = 0;
 
     return ff_cbs_bsf_generic_init(bsf, &mpeg2_metadata_type);
 }
@@ -289,6 +295,8 @@ static void mpeg2_metadata_close(AVBSFContext *bsf) {
         i_seq_reporting(bsf, ctx);
     av_log(bsf, AV_LOG_INFO, "she_a: %d, she_b: %d, pce: %d\n",
            ctx->she_count_a, ctx->she_count_b, ctx->pce_count);
+    av_log(bsf, AV_LOG_INFO, "fs: %d, call: %d\n",
+           ctx->fs_count, ctx->call_count);
     ff_cbs_bsf_generic_close(bsf);
 }
 #define OFFSET(x) offsetof(MPEG2MetadataContext, x)
