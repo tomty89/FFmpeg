@@ -94,7 +94,7 @@ static void parse_waveformatex(AVFormatContext *s, AVIOContext *pb, AVCodecParam
 int ff_get_wav_header(AVFormatContext *s, AVIOContext *pb,
                       AVCodecParameters *par, int size, int big_endian)
 {
-    int id, channels;
+    int id, channels = 0;
     uint64_t bitrate = 0;
 
     if (size < 14) {
@@ -118,15 +118,15 @@ int ff_get_wav_header(AVFormatContext *s, AVIOContext *pb,
         bitrate            = avio_rb32(pb) * 8LL;
         par->block_align = avio_rb16(pb);
     }
-    if (size == 14) {  /* We're dealing with plain vanilla WAVEFORMAT */
-        par->bits_per_coded_sample = 8;
-    } else {
+    if (size >= 16) {  /* We're dealing with PCMWAVEFORMAT */
         if (!big_endian) {
             par->bits_per_coded_sample = avio_rl16(pb);
         } else {
             par->bits_per_coded_sample = avio_rb16(pb);
         }
-    }
+    } else if (channels && par->sample_rate) {  /* We're dealing with WAVEFORMAT */
+        par->bits_per_coded_sample = bitrate / channels / par->sample_rate;
+    }  /* Apparently size would be >= 32 if id == 0x0165; see below */
     if (id == 0xFFFE) {
         par->codec_tag = 0;
     } else {
